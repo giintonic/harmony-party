@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmony Party Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=K2D:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'K2D', sans-serif; background: #000; color: #fff; }
+        .card { background: #111; border: 1px solid #333; }
+        .input-box { background: #1a1a1a; border: 1px solid #444; }
+    </style>
+</head>
+<body class="p-4">
+    <div class="max-w-md mx-auto space-y-6">
+        <h1 class="text-3xl font-black text-blue-500 text-center">🍻 Harmony Party</h1>
+
+        <div class="card p-6 rounded-3xl space-y-3">
+            <input type="text" id="name" placeholder="ชื่อของคุณ" class="w-full p-4 rounded-xl input-box text-xl">
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="setStatus('ดื่ม')" id="btnDrink" class="p-4 rounded-xl border border-blue-500 bg-blue-900">🍻 ดื่มแอลฯ</button>
+                <button onclick="setStatus('ไม่ดื่ม')" id="btnNoDrink" class="p-4 rounded-xl border border-gray-500">🥤 ไม่ดื่ม</button>
+            </div>
+            <input type="text" id="item" placeholder="รายการที่ซื้อ (มีคำว่า เบียร์/เหล้า/แอลฯ จะแยกหาร)" class="w-full p-4 rounded-xl input-box text-xl">
+            <input type="number" id="price" placeholder="ราคา" class="w-full p-4 rounded-xl input-box text-xl">
+            <select id="bankName" class="w-full p-4 rounded-xl input-box text-xl">
+                <option value="พร้อมเพย์">พร้อมเพย์</option>
+                <option value="กสิกรไทย">กสิกรไทย</option>
+                <option value="ไทยพาณิชย์">ไทยพาณิชย์</option>
+                <option value="กรุงเทพ">กรุงเทพ</option>
+            </select>
+            <input type="text" id="accNo" placeholder="เลขบัญชี / เบอร์โทร" class="w-full p-4 rounded-xl input-box text-xl">
+            <button onclick="saveData()" class="w-full bg-blue-600 p-6 rounded-2xl font-black text-xl">บันทึกข้อมูลของฉัน</button>
+        </div>
+
+        <button onclick="calculate()" class="w-full bg-yellow-500 text-black font-black p-4 rounded-xl">คำนวณสรุปบิล (Net Settlement)</button>
+        <div id="resultBox" class="card p-6 rounded-2xl hidden space-y-2">
+            <h2 class="font-bold border-b border-gray-700 pb-2">ผลสรุปรายบุคคล</h2>
+            <div id="displayResult" class="text-sm"></div>
+        </div>
+        <button onclick="resetData()" class="w-full text-gray-500 text-xs">รีเซ็ตบิลใหม่ทั้งหมด</button>
+    </div>
+
+    <script>
+        let status = 'ดื่ม';
+        let allData = JSON.parse(localStorage.getItem('partyData')) || [];
+
+        function setStatus(s) {
+            status = s;
+            document.getElementById('btnDrink').className = s === 'ดื่ม' ? 'p-4 rounded-xl border border-blue-500 bg-blue-900' : 'p-4 rounded-xl border border-gray-500';
+            document.getElementById('btnNoDrink').className = s === 'ไม่ดื่ม' ? 'p-4 rounded-xl border border-blue-500 bg-blue-900' : 'p-4 rounded-xl border border-gray-500';
+        }
+
+        function saveData() {
+            let entry = {
+                name: document.getElementById('name').value,
+                status: status,
+                item: document.getElementById('item').value,
+                price: parseFloat(document.getElementById('price').value) || 0,
+                bankName: document.getElementById('bankName').value,
+                accNo: document.getElementById('accNo').value
+            };
+            allData.push(entry);
+            localStorage.setItem('partyData', JSON.stringify(allData));
+            alert("บันทึกข้อมูลของ " + entry.name + " เรียบร้อย!");
+        }
+
+        function calculate() {
+            let summary = {};
+            allData.forEach(i => {
+                if(!summary[i.name]) summary[i.name] = { name: i.name, status: i.status, paid: 0, bank: i.bankName, acc: i.accNo };
+                summary[i.name].paid += i.price;
+            });
+
+            let foodItems = allData.filter(i => !i.item.toLowerCase().match(/เบียร์|เหล้า|แอล|ไวน์/));
+            let alcItems = allData.filter(i => i.item.toLowerCase().match(/เบียร์|เหล้า|แอล|ไวน์/));
+
+            let totalFood = foodItems.reduce((s, i) => s + i.price, 0);
+            let totalAlc = alcItems.reduce((s, i) => s + i.price, 0);
+
+            let allPeople = Object.keys(summary).length;
+            let drinkers = Object.values(summary).filter(i => i.status === 'ดื่ม').length;
+
+            let avgFood = totalFood / allPeople;
+            let avgAlc = drinkers > 0 ? (totalAlc / drinkers) : 0;
+
+            let display = document.getElementById('displayResult');
+            document.getElementById('resultBox').classList.remove('hidden');
+            
+            display.innerHTML = Object.values(summary).map(p => {
+                let shouldPay = avgFood + (p.status === 'ดื่ม' ? avgAlc : 0);
+                let balance = Math.round(shouldPay - p.paid);
+                let action = balance > 0 ? `<b class="text-red-400">ต้องโอน: ${balance}</b>` : `<b class="text-green-400">ได้รับคืน: ${Math.abs(balance)}</b>`;
+                let bankInfo = balance < 0 ? `<div class="text-xs text-gray-400">โอนเข้า: ${p.bank} (${p.acc})</div>` : "";
+                
+                return `<div class="mb-4 p-2 border-b border-gray-700">
+                            <p class="font-bold">${p.name}</p>
+                            <p>${action} บ. ${bankInfo}</p>
+                        </div>`;
+            }).join('');
+        }
+
+        function resetData() {
+            if(confirm("ล้างข้อมูลทั้งหมดจริงไหม?")) {
+                localStorage.removeItem('partyData');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
